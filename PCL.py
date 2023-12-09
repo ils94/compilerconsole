@@ -1,21 +1,15 @@
 import tkinter as tk
 import subprocess
-from threading import Thread
 from tkinter import filedialog
 import os
+import readFile
+import writeFile
+import centerWindow
+import multithreading
 
 
-def center_window(window, min_width, min_height):
-    # Get the screen width and height
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
-
-    # Calculate the x and y coordinates for centering
-    x = (screen_width - min_width) // 2
-    y = (screen_height - min_height) // 2
-
-    # Set the window's geometry to center it on the screen
-    window.geometry(f"{min_width}x{min_height}+{x}+{y}")
+def start():
+    multithreading.multithreading(execute_command)
 
 
 def open_folder_dialog(event):
@@ -25,11 +19,36 @@ def open_folder_dialog(event):
         python_path_entry.insert(0, folder_path)
 
 
-def bind_event(event):
-    execute_command()
+def update_text_widget(process):
+    writeFile.remember_last_python(python_path_entry)
+
+    execute_button.config(text="Please wait...")
+    execute_button.config(state="disabled")
+
+    for line in process.stdout:
+        text_widget["state"] = "normal"
+        text_widget.insert(tk.END, line)
+        text_widget.insert(tk.END, "\n")
+        text_widget["state"] = "disabled"
+
+        text_widget.see(tk.END)  # Scroll to the end of the text
+
+    for line in process.stderr:
+        text_widget["state"] = "normal"
+        text_widget.insert(tk.END, line)
+        text_widget.insert(tk.END, "\n")
+        text_widget["state"] = "disabled"
+
+        text_widget.see(tk.END)  # Scroll to the end of the text
+
+    execute_button.config(state="normal")
+    execute_button.config(text="Execute Command")
 
 
 def execute_command():
+    if not python_path_entry.get() or not python_command_entry.get():
+        return
+
     text_widget["state"] = "normal"
     text_widget.delete("1.0", "end")
     text_widget["state"] = "disabled"
@@ -43,24 +62,7 @@ def execute_command():
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                universal_newlines=True)
 
-    def update_text_widget():
-        for line in process.stdout:
-            text_widget["state"] = "normal"
-            text_widget.insert(tk.END, line)
-            text_widget.insert(tk.END, "\n")
-            text_widget["state"] = "disabled"
-
-        for line in process.stderr:
-            text_widget["state"] = "normal"
-            text_widget.insert(tk.END, line)
-            text_widget.insert(tk.END, "\n")
-            text_widget["state"] = "disabled"
-
-        text_widget.see(tk.END)  # Scroll to the end of the text
-
-    # Start a separate thread to update the text widget with command output
-    update_thread = Thread(target=update_text_widget)
-    update_thread.start()
+    update_text_widget(process)
 
 
 root = tk.Tk()
@@ -70,7 +72,7 @@ root.resizable(False, False)
 if os.path.isfile("icon.ico"):
     root.iconbitmap("icon.ico")
 
-center_window(root, 500, 500)
+centerWindow.center_window(root, 500, 500)
 
 frame_1 = tk.Frame(root)
 frame_1.pack(fill="x", padx=10, pady=5)
@@ -87,12 +89,11 @@ python_command_label.pack()
 
 python_command_entry = tk.Entry(frame_1)
 python_command_entry.pack(fill="x")
-python_command_entry.bind("<Return>", bind_event)
 
 frame_2 = tk.Frame(root)
 frame_2.pack(fill="x", padx=10, pady=5)
 
-execute_button = tk.Button(frame_2, text="Execute Command", command=execute_command)
+execute_button = tk.Button(frame_2, text="Execute Command", width=15, command=start)
 execute_button.pack(side="left")
 
 text_widget = tk.Text(root, wrap=tk.WORD, height=100)  # Adjust the height here
@@ -104,5 +105,7 @@ scrollbar = tk.Scrollbar(text_widget)
 scrollbar.pack(side="right", fill="y")
 text_widget.config(yscrollcommand=scrollbar.set)
 scrollbar.config(command=text_widget.yview)
+
+readFile.read_last_python_path(python_path_entry)
 
 root.mainloop()
